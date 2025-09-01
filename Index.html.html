@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KinoHub — Sizning Kino Saytingiz</title>
+  <style>
+    /* Oddiy, toza va mobilga mos dizayn */
+    :root{
+      --bg:#0f1720;
+      --card:#0b1220;
+      --accent:#ff5a5f;
+      --muted:#9aa6b2;
+      --white:#eef6f8;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter, system-ui, Arial;background:linear-gradient(180deg,#071021 0%, #0b1724 100%);color:var(--white);min-height:100vh;}
+    header{padding:18px 16px;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;gap:12px;align-items:center;justify-content:space-between}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:44px;height:44px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700}
+    h1{font-size:18px;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    input.search{padding:8px 12px;border-radius:8px;border:0;background:#0b2230;color:var(--white);min-width:180px}
+    select{padding:8px;border-radius:8px;border:0;background:#0b2230;color:var(--white)}
+    button.btn{background:var(--accent);border:0;color:white;padding:9px 12px;border-radius:8px;cursor:pointer}
+    .container{padding:18px;max-width:1100px;margin:18px auto}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(2,6,23,0.6);cursor:pointer;transition:transform .15s}
+    .card:hover{transform:translateY(-6px)}
+    .poster{width:100%;height:230px;object-fit:cover;display:block;background:#051018}
+    .meta{padding:10px}
+    .title{font-size:15px;margin:0 0 6px;color:var(--white)}
+    .sub{font-size:12px;color:var(--muted);margin:0}
+    .empty{color:var(--muted);text-align:center;padding:60px 20px;border:2px dashed rgba(255,255,255,0.03);border-radius:8px}
+    /* Modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+    .modal{background:var(--card);max-width:900px;width:100%;border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+    .modal .body{display:flex;gap:12px;padding:14px}
+    .modal img{width:220px;height:320px;object-fit:cover;border-radius:6px}
+    .modal .info{color:var(--white)}
+    .modal h2{margin:0 0 6px;font-size:20px}
+    .modal p{color:var(--muted);margin:4px 0 8px}
+    .rm-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px;border-radius:8px;cursor:pointer}
+    .play{background:#10b981;border:0;color:white;padding:10px 14px;border-radius:8px;cursor:pointer;margin-left:8px}
+    /* Add form */
+    .add-form{background:linear-gradient(180deg,#061323,#0a1b2b);padding:12px;border-radius:10px;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .add-form input{padding:8px;border-radius:8px;border:0;background:#062234;color:var(--white);min-width:160px}
+    .footer{padding:18px;text-align:center;color:var(--muted)}
+    @media (max-width:720px){
+      .modal .body{flex-direction:column;align-items:center}
+      .modal img{width:100%;height:220px}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">K</div>
+    <div>
+      <h1>KinoHub</h1>
+      <div style="font-size:12px;color:rgba(255,255,255,0.6)">Filmlar — yangiliklar — oson</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <input class="search" id="search" placeholder="Film nomi qidirish..." />
+    <select id="sort">
+      <option value="new">So'ngilar</option>
+      <option value="old">Kechagi</option>
+      <option value="az">A → Z</option>
+      <option value="za">Z → A</option>
+    </select>
+    <button class="btn" id="openAdd">➕ Film qo'shish</button>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Qo'shish formasi (ko'rsatmasiz ravishda) -->
+  <div id="addSection" style="display:none" class="add-form">
+    <input id="title" placeholder="Film nomi" />
+    <input id="year" placeholder="Yil (masalan 2014)" />
+    <input id="director" placeholder="Rejissyor" />
+    <input id="poster" placeholder="Poster URL (https://...)" />
+    <input id="video" placeholder="Video URL (https://... yoki YouTube)" style="min-width:260px" />
+    <button class="btn" id="saveMovie">Saqlash</button>
+    <button class="rm-btn" id="cancelAdd">Bekor qilish</button>
+  </div>
+
+  <!-- Ro'yxat -->
+  <div id="grid" class="grid" aria-live="polite"></div>
+
+  <div id="empty" class="empty" style="display:none">
+    Hozircha film yo'q. "Film qo'shish" tugmasi bilan birinchi filmni qo'shing.
+  </div>
+</div>
+
+<!-- Modal batafsil -->
+<div id="modalBg" class="modal-bg" role="dialog" aria-modal="true">
+  <div class="modal" role="document">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,0.03)">
+      <div style="font-weight:600">Film haqida</div>
+      <div>
+        <button class="rm-btn" id="closeModal">Yopish</button>
+      </div>
+    </div>
+    <div class="body">
+      <img id="mPoster" src="" alt="poster" />
+      <div class="info">
+        <h2 id="mTitle">Title</h2>
+        <p id="mSub">Year • Director</p>
+        <p id="mDesc" style="color:var(--muted)">Video manzili va qo‘shimcha ma'lumot shu yerda chiqadi.</p>
+        <div style="margin-top:12px">
+          <a id="playBtn" class="play" href="#" target="_blank">▶ Play</a>
+          <button class="rm-btn" id="deleteMovie">O'chirish</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">© <span id="yearNow"></span> KinoHub — Sayt shablon. Video fayllar sizning manbaingizdan yuklanadi.</div>
+
+<script>
+/* 
+  Oddiy SPA-like funksiyalar: localStorage bilan saqlash, qidiruv, saralash, modal, qo'shish va o'chirish.
+  Barcha matnlar o'zbek tilida.
+*/
+
+// Sample boshlang'ich filmlar
+const SAMPLE = [
+  {id: genId(), title:"The Matrix", year:"1999", director:"Wachowski", poster:"https://m.media-amazon.com/images/I/51EG732BV3L.jpg", video:""},
+  {id: genId(), title:"Interstellar", year:"2014", director:"Christopher Nolan", poster:"https://m.media-amazon.com/images/I/71n58Jv2cML._AC_SL1024_.jpg", video:""},
+  {id: genId(), title:"Inception", year:"2010", director:"Christopher Nolan", poster:"https://m.media-amazon.com/images/I/51s+4nK2GxL._AC_.jpg", video:""}
+];
+
+const LS_KEY = "kinohub_movies_v1";
+
+function genId(){ return 'm_'+Math.random().toString(36).slice(2,9) }
+
+function loadMovies(){
+  const raw = localStorage.getItem(LS_KEY);
+  if(!raw) {
+    localStorage.setItem(LS_KEY, JSON.stringify(SAMPLE));
+    return SAMPLE;
+  }
+  try{ return JSON.parse(raw) } catch(e){ localStorage.setItem(LS_KEY, JSON.stringify(SAMPLE)); return SAMPLE }
+}
+
+function saveMovies(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)) }
+
+let movies = loadMovies();
+
+// UI elementlar
+const grid = document.getElementById('grid');
+const emptyBox = document.getElementById('empty');
+const searchInput = document.getElementById('search');
+const sortSelect = document.getElementById('sort');
+const openAdd = document.getElementById('openAdd');
+const addSection = document.getElementById('addSection');
+const saveMovieBtn = document.getElementById('saveMovie');
+const cancelAdd = document.getElementById('cancelAdd');
+
+const titleIn = document.getElementById('title');
+const yearIn = document.getElementById('year');
+const directorIn = document.getElementById('director');
+const posterIn = document.getElementById('poster');
+const videoIn = document.getElementById('video');
+
+const modalBg = document.getElementById('modalBg');
+const mPoster = document.getElementById('mPoster');
+const mTitle = document.getElementById('mTitle');
+const mSub = document.getElementById('mSub');
+const mDesc = document.getElementById('mDesc');
+const playBtn = document.getElementById('playBtn');
+const closeModal = document.getElementById('closeModal');
+const deleteMovieBtn = document.getElementById('deleteMovie');
+
+document.getElementById('yearNow').innerText = new Date().getFullYear();
+
+// Render funksiyasi
+function renderList(){
+  const q = searchInput.value.trim().toLowerCase();
+  let list = movies.slice();
+
+  // saralash
+  const s = sortSelect.value;
+  if(s==='az') list.sort((a,b)=> a.title.localeCompare(b.title));
+  else if(s==='za') list.sort((a,b)=> b.title.localeCompare(a.title));
+  else if(s==='new') list.sort((a,b)=> b.id.localeCompare(a.id)); // taxminiy
+  else if(s==='old') list.sort((a,b)=> a.id.localeCompare(b.id));
+
+  // qidiruv filter
+  if(q) list = list.filter(m => m.title.toLowerCase().includes(q) || (m.director||'').toLowerCase().includes(q));
+
+  grid.innerHTML = '';
+  if(list.length === 0){
+    emptyBox.style.display = 'block';
+  } else {
+    emptyBox.style.display = 'none';
+    list.forEach(m => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <img class="poster" loading="lazy" src="${escapeHtml(m.poster||'')}" alt="${escapeHtml(m.title)}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22320%22><rect width=%22200%22 height=%22320%22 fill=%22%23071e2b%22/></svg>'" />
+        <div class="meta">
+          <div class="title">${escapeHtml(m.title)}</div>
+          <div class="sub">${escapeHtml(m.year||'')} • ${escapeHtml(m.director||'')}</div>
+        </div>
+      `;
+      // card click => modal
+      card.addEventListener('click', ()=> openModal(m.id));
+      grid.appendChild(card);
+    });
+  }
+}
+
+// Sanitizer (oddiy)
+function escapeHtml(s){ if(!s) return ''; return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;') }
+
+// Modal ochish
+let currentId = null;
+function openModal(id){
+  const m = movies.find(x=>x.id===id);
+  if(!m) return;
+  currentId = id;
+  mPoster.src = m.poster || '';
+  mTitle.innerText = m.title;
+  mSub.innerText = `${m.year||'—'} • ${m.director||'—'}`;
+  mDesc.innerText = (m.video ? "Video manzili: " + m.video : "Video manzili ko'rsatilmagan.");
+  playBtn.href = m.video || "#";
+  playBtn.style.display = m.video ? 'inline-block' : 'none';
+  modalBg.style.display = 'flex';
+}
+
+// Modal yopish
+function closeModalFn(){ modalBg.style.display = 'none'; currentId = null }
+closeModal.addEventListener('click', closeModalFn);
+modalBg.addEventListener('click', (e)=>{ if(e.target===modalBg) closeModalFn() })
+
+// O'chirish
+deleteMovieBtn.addEventListener('click', ()=>{
+  if(!currentId) return;
+  if(!confirm("Haqiqatan ham filmni o'chirmoqchimisiz?")) return;
+  movies = movies.filter(x=>x.id !== currentId);
+  saveMovies(movies);
+  renderList();
+  closeModalFn();
+});
+
+// Qo'shish panelini ochish
+openAdd.addEventListener('click', ()=>{
+  addSection.style.display = addSection.style.display === 'none' ? 'flex' : 'none';
+  if(addSection.style.display==='flex') titleIn.focus();
+});
+
+// Bekor qilish
+cancelAdd.addEventListener('click', ()=>{ addSection.style.display='none'; clearForm(); });
+
+// Saqlash
+saveMovieBtn.addEventListener('click', ()=>{
+  const title = titleIn.value.trim();
+  if(!title){ alert('Iltimos film nomini kiriting.'); titleIn.focus(); return; }
+  const newM = {
+    id: genId(),
+    title,
+    year: yearIn.value.trim(),
+    director: directorIn.value.trim(),
+    poster: posterIn.value.trim(),
+    video: videoIn.value.trim()
+  };
+  movies.unshift(newM); // yuqoriga qo'yamiz
+  saveMovies(movies);
+  renderList();
+  clearForm();
+  addSection.style.display = 'none';
+});
+
+// formni tozalash
+function clearForm(){ titleIn.value=''; yearIn.value=''; directorIn.value=''; posterIn.value=''; videoIn.value=''; }
+
+// Qidiruv va saralash eventlari
+searchInput.addEventListener('input', renderList);
+sortSelect.addEventListener('change', renderList);
+
+// Dastlab render
+renderList();
+
+/* Qo'shimcha maslahatlar:
+  - Bosh sahifada ko'proq ma'lumot (janr, davomiylik) qo'shish mumkin.
+  - Agar video fayllarni o'zingiz joylamoqchi bo'lsangiz — server yoki S3 kabi saqlash kerak.
+  - Keyinroq xohlasangiz, men buni Node.js + SQLite yoki Flask + SQLite bilan backendli ko'rinishga o'tkazib beraman.
+*/
+
+</script>
+</body>
+</html>
